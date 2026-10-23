@@ -1,3 +1,5 @@
+import { getStore } from "@netlify/blobs";
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "Content-Type",
@@ -60,8 +62,17 @@ export default async (req) => {
       );
     }
 
+    const store = getStore("ctrader");
+
+    await store.setJSON("tokens", {
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      expires_in: tokenData.expires_in,
+      saved_at: new Date().toISOString()
+    });
+
     return new Response(
-      "cTrader connected successfully. Access token received.",
+      "cTrader connected successfully. Tokens saved.",
       { status: 200, headers: cors }
     );
   } catch (error) {
