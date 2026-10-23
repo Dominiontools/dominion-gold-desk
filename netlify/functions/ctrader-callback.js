@@ -1,25 +1,73 @@
-export async function handler(event) {
-  const code = event.queryStringParameters?.code;
-  const redirect = "https://comforting-alfajores-bf799b.netlify.app";
-  if (!code)
-    return { statusCode: 400, body: "Missing cTrader authorization code." };
-  const r = await fetch("https://openapi.ctrader.com/apps/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code: code,
-      redirect_uri: redirect,
-      client_id: process.env.CTRADER_CLIENT_ID,
-      client_secret: process.env.CTRADER_CLIENT_SECRET,
-    }),
-  });
-  const t = await r.json();
-  if (!t.access_token)
-    return { statusCode: 400, body: "cTrader did not return an access token." };
-  return {
-    statusCode: 200,
-    headers: { "Content-Type": "text/html" },
-    body: `<html><body style="font-family:sans-serif;background:#0e1923;color:#e8edf1;padding:30px"><h2>Dominion Gold Signal Desk</h2><p>cTrader connected successfully.</p><textarea style="width:100%;height:120px">${t.access_token}</textarea></body></html>`,
-  };
-}
+const cors = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "GET, OPTIONS"
+};
+
+export default async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: cors });
+  }
+
+  const url = new URL(req.url);
+  const code = url.searchParams.get("code");
+
+  if (!code) {
+    return new Response("Missing cTrader authorization code.", {
+      status: 400,
+      headers: cors
+    });
+  }
+
+  const clientId = process.env.CTRADER_CLIENT_ID;
+  const clientSecret = process.env.CTRADER_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    return new Response("Missing cTrader environment variables.", {
+      status: 500,
+      headers: cors
+    });
+  }
+
+  const redirectUri =
+    "https://comforting-alfajores-bf799b.netlify.app/.netlify/functions/ctrader-callback";
+
+  try {
+    const tokenResponse = await fetch(
+      "https://openapi.ctrader.com/apps/token",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code: code,
+          redirect_uri: redirectUri,
+          client_id: clientId,
+          client_secret: clientSecret
+        })
+      }
+    );
+
+    const tokenData = await tokenResponse.json();
+
+    if (!tokenData.access_token) {
+      return new Response(
+        "cTrader did not return an access token. Details: " +
+          JSON.stringify(tokenData),
+        { status: 400, headers: cors }
+      );
+    }
+
+    return new Response(
+      "cTrader connected successfully. Access token received.",
+      { status: 200, headers: cors }
+    );
+  } catch (error) {
+    return new Response("cTrader connection failed: " + error.message, {
+      status: 500,
+      headers: cors
+    });
+  }
+};
