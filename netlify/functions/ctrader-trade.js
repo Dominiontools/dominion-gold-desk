@@ -2,8 +2,7 @@ import { getStore } from "@netlify/blobs";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS"
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS"
 };
 
 const ACCOUNT_ID = 49272140;
@@ -16,19 +15,15 @@ export default async (req) => {
     return new Response(null, { status: 204, headers: cors });
   }
 
-  if (req.method !== "POST") {
-    return new Response("Use POST", { status: 405, headers: cors });
+  const url = new URL(req.url);
+  const symbol = url.searchParams.get("symbol") || "EURUSD";
+  const side = (url.searchParams.get("side") || "BUY").toUpperCase();
+
+  if (!["BUY", "SELL"].includes(side)) {
+    return new Response("side must be BUY or SELL", { status: 400, headers: cors });
   }
 
   try {
-    const body = await req.json();
-    const symbol = body.symbol || "EURUSD";
-    const side = (body.side || "BUY").toUpperCase();
-
-    if (!["BUY", "SELL"].includes(side)) {
-      return new Response("side must be BUY or SELL", { status: 400, headers: cors });
-    }
-
     const store = getStore("ctrader");
     const tokens = await store.get("tokens", { type: "json" });
 
@@ -49,7 +44,8 @@ export default async (req) => {
       stopLossPips: STOP_LOSS_PIPS,
       takeProfitPips: TAKE_PROFIT_PIPS,
       rewardRiskRatio: "1:2",
-      accessTokenFound: true
+      accessTokenFound: true,
+      note: "No order was placed. This is a connection test."
     }, null, 2), {
       status: 200,
       headers: { ...cors, "Content-Type": "application/json" }
